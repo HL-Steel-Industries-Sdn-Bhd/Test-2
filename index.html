@@ -13,28 +13,32 @@
       display: flex;
       flex-direction: row; /* 横排布局 */
       height: 100vh;
-      overflow: hidden;
-    }
-    #leftPanel, #rightPanel {
-      padding: 2vw;
-      box-sizing: border-box;
+      overflow: hidden;   /* 避免双重滚动条 */
     }
     #leftPanel {
-      flex: 1;
+      flex: 0 0 40%;      /* 固定宽度比例（40%） */
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
+      padding: 2vw;
       background: #fff;
       box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+      position: sticky;   /* 关键！左边固定 */
+      top: 0;
+      height: 100vh;      /* 占满屏幕高度 */
+      box-sizing: border-box;
     }
     #rightPanel {
-      flex: 1.2;
-      overflow-y: auto;
+      flex: 1;
+      padding: 2vw;
+      height: 100vh;
+      overflow-y: auto;   /* 右边可以滑动 */
+      box-sizing: border-box;
     }
     h2 {
       color: #2c3e50;
-      font-size: 2vw;
+      font-size: 1.8vw;
       margin: 2vh 0;
     }
     #reader {
@@ -69,7 +73,7 @@
     table {
       margin: 20px auto;
       border-collapse: collapse;
-      width: 95%;
+      width: 100%;
       background: #fff;
       border-radius: 8px;
       overflow: hidden;
@@ -94,17 +98,16 @@
   </style>
 </head>
 <body>
-  <!-- 左边扫码区 -->
+  <!-- 左边固定扫码区 -->
   <div id="leftPanel">
     <h2>Welcome Angelina (A0001)</h2>
     <div id="reader"></div>
-    <!-- 给电脑扫码枪用的输入框 -->
     <input type="text" id="scannerInput" placeholder="请扫描图纸上的 QR Code" autofocus>
     <div id="warningMsg">Bro,冷静! 这个你Scan过了</div>
     <div id="countBox">已扫描 0 张图纸</div>
   </div>
 
-  <!-- 右边结果区 -->
+  <!-- 右边可滚动结果区 -->
   <div id="rightPanel">
     <table id="resultTable">
       <thead>
@@ -148,7 +151,6 @@
         let unit = u.searchParams.get("unit") || "";
         let dim = u.searchParams.get("dim") || "";
 
-        // 格式化输出
         if (salesOrder) salesOrder = salesOrder.replace(/^SO/, "SO-");
         if (dim) dim = dim.replace(/x/g, " x ") + " mm";
         if (name) name = name.replace(/\+/g, " ");
@@ -217,5 +219,6 @@
   </script>
 </body>
 </html>
+
 
 
