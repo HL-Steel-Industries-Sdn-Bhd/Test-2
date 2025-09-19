@@ -1,204 +1,370 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>工人扫码 - Angelina</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f5f5f5;
-      display: flex;
-      flex-direction: row;
-      height: 100vh;
-      overflow: hidden;
+    :root{ --left-width:35%; --focus-border:3px; --overlay-dark:rgba(0,0,0,0.45); }
+    html,body { height:100%; margin:0; font-family: "Segoe UI", Arial, sans-serif; }
+    body { display:flex; background:#f4f6f9; height:100vh; overflow:hidden; }
+
+    /* 左侧扫码区（固定占 35%）*/
+    #leftPanel {
+      flex: 0 0 var(--left-width);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:flex-start;
+      gap:12px;
+      padding:20px 12px;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.06);
+      background: linear-gradient(180deg,#fff,#f1f4ff);
     }
-    #scanner {
-      flex: 1;
-      background: black;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-    }
+    #leftHeader { margin:0; color:#34495e; font-size:18px; }
+    /* reader 为正方形 viewfinder */
     #reader {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
+      width: 92%;
+      max-width: 520px;
+      aspect-ratio: 1 / 1; /* 保证一直为正方形 */
+      border-radius:12px;
+      overflow:hidden;
+      position:relative;
+      background:#000; /* 在 video 还没就绪时显示黑背景 */
+      box-shadow: 0 6px 18px rgba(0,0,0,0.12);
     }
+    /* 让 html5-qrcode 里创建的 video/canvas 填满 reader */
+    #reader video, #reader canvas {
+      width:100% !important;
+      height:100% !important;
+      object-fit: cover !important;
+      display:block;
+    }
+    /* 将焦点框放在 reader 中心，并用 box-shadow 暗化外部 */
     .overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      pointer-events:none;
     }
-    .focus-box {
-      border: 3px solid #00ff00;
-      box-sizing: border-box;
+    #focusBox {
+      box-sizing:border-box;
+      border: var(--focus-border) solid #00e676;
+      border-radius:8px;
+      /* big shadow to darken outside the box while leaving center clear */
+      box-shadow: 0 0 0 9999px var(--overlay-dark);
+      pointer-events:none;
     }
-    #sidebar {
-      width: 40%;
-      background: #fff;
-      display: flex;
-      flex-direction: column;
-      border-left: 1px solid #ccc;
-    }
-    #current-scan {
-      padding: 10px;
-      background: #eaeaea;
-      border-bottom: 1px solid #ccc;
-      flex-shrink: 0;
-    }
-    #scan-count {
-      font-size: 14px;
-      color: #555;
-      margin-top: 5px;
-    }
-    #scanned-list {
+
+    /* 右侧结果区 */
+    #rightPanel {
       flex: 1;
-      overflow-y: auto;
-      padding: 10px;
+      display:flex;
+      flex-direction:column;
+      min-width:0;
     }
-    .scanned-item {
-      border-bottom: 1px solid #ddd;
-      padding: 8px 0;
-      font-size: 14px;
-      color: #333;
+    #currentBox {
+      background:#fff;
+      padding:12px 16px;
+      border-bottom:1px solid #e6e9ee;
+      position:sticky;
+      top:0;
+      z-index:5;
     }
-    .toast {
+    #currentBox h3 { margin:0 0 6px 0; color:#2c3e50; font-size:16px; }
+    #currentInfo { color:#34495e; font-size:14px; line-height:1.5; }
+    #countBox { margin-top:8px; color:#ff9800; font-weight:700; }
+
+    #listBox { flex:1; overflow:auto; padding:12px; background:#f7f9fc; }
+    table { width:100%; border-collapse:collapse; background:#fff; border-radius:8px; overflow:hidden; }
+    th,td { padding:10px; font-size:14px; border:1px solid #eee; text-align:left; }
+    th { background:#fbfbfd; font-weight:700; color:#333; }
+    tr:nth-child(even){ background:#fafafa; }
+
+    /* toast */
+    #toast {
       position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.8);
-      color: #fff;
-      padding: 10px 20px;
-      border-radius: 5px;
-      font-size: 14px;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s ease-in-out;
-      z-index: 9999;
+      bottom: 22px;
+      right: 22px;
+      background: #e74c3c;
+      color:#fff;
+      padding:10px 14px;
+      border-radius:8px;
+      font-size:14px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+      opacity:0;
+      transform: translateY(8px);
+      transition: opacity .28s, transform .28s;
+      z-index:9999;
+      pointer-events:none;
     }
-    .toast.show {
-      opacity: 1;
+    #toast.show { opacity:1; transform: translateY(0); pointer-events:none; }
+    @media (max-width:800px) {
+      :root { --left-width:40%; }
+      #leftPanel { padding:12px; }
+      #reader { max-width:400px; }
     }
   </style>
 </head>
 <body>
-  <div id="scanner">
-    <div id="reader"></div>
-    <div class="overlay">
-      <div id="focusBox" class="focus-box"></div>
+  <!-- 左边扫码区 -->
+  <div id="leftPanel">
+    <h2 id="leftHeader">Welcome Angelina (A0001)</h2>
+    <div id="reader">
+      <!-- html5-qrcode 会在此插入 video/canvas -->
+      <div class="overlay">
+        <div id="focusBox" aria-hidden="true"></div>
+      </div>
     </div>
-  </div>
-  <div id="sidebar">
-    <div id="current-scan">
-      <div><strong>当前扫描：</strong><span id="currentText">无</span></div>
-      <div id="scan-count">已扫描 0 张</div>
-    </div>
-    <div id="scanned-list"></div>
+    <input id="scannerInput" type="text" placeholder="请扫描图纸上的 QR Code 或贴入 URL 后按 Enter" style="width:92%;padding:8px;border-radius:6px;border:1px solid #ccc;font-size:14px;" />
   </div>
 
-  <div id="toast" class="toast"></div>
+  <!-- 右边结果区 -->
+  <div id="rightPanel">
+    <div id="currentBox">
+      <h3>当前扫描结果</h3>
+      <div id="currentInfo">等待扫描...</div>
+      <div id="countBox">已扫描 0 张图纸</div>
+    </div>
+
+    <div id="listBox">
+      <table id="resultTable">
+        <thead>
+          <tr>
+            <th>Sales Order No.</th>
+            <th>Item No.</th>
+            <th>Name</th>
+            <th>Units</th>
+            <th>Dimension</th>
+            <th>Link</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite">提示</div>
 
   <script>
-    let scannedSet = new Set();
-    let scanCount = 0;
-    let lastToastTime = 0;
+    /********* 配置：按需改 ALLOWED_HOST / ALLOWED_PATH *********/
+    const ALLOWED_HOST = "yourdomain.github.io";
+    const ALLOWED_PATH = "/repo"; // 不带尾部斜杠
+    /*************************************************************/
 
-    function showToast(message) {
-      const now = Date.now();
-      if (now - lastToastTime < 3000) return; 
-      lastToastTime = now;
-      const toast = document.getElementById("toast");
-      toast.textContent = message;
+    const html5QrCode = new Html5Qrcode(/* element id */ "reader", { verbose: false });
+
+    const scannerInput = document.getElementById("scannerInput");
+    const toast = document.getElementById("toast");
+    const resultTbody = document.querySelector("#resultTable tbody");
+    const countBox = document.getElementById("countBox");
+    const currentInfo = document.getElementById("currentInfo");
+    const focusBox = document.getElementById("focusBox");
+    const reader = document.getElementById("reader");
+
+    const scannedLinks = new Set();
+    let lastDuplicateTime = 0;
+    let toastTimer = null;
+
+    function showToast(msg, bg = null) {
+      toast.textContent = msg;
+      if (bg) toast.style.backgroundColor = bg;
+      else toast.style.backgroundColor = "#e74c3c";
       toast.classList.add("show");
-      setTimeout(() => {
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
         toast.classList.remove("show");
+        toastTimer = null;
       }, 2000);
     }
 
-    function updateScanList(text) {
-      const currentText = document.getElementById("currentText");
-      const scanCountDiv = document.getElementById("scan-count");
-      const list = document.getElementById("scanned-list");
+    function updateCount() {
+      countBox.textContent = "已扫描 " + scannedLinks.size + " 张图纸";
+    }
 
-      currentText.textContent = text;
+    function normalizePath(path) {
+      return path.replace(/\/+$/, "");
+    }
 
-      if (!scannedSet.has(text)) {
-        scannedSet.add(text);
-        scanCount++;
-        scanCountDiv.textContent = `已扫描 ${scanCount} 张`;
-
-        const div = document.createElement("div");
-        div.className = "scanned-item";
-        div.textContent = text;
-        list.prepend(div);
-      } else {
-        showToast("⚠️ 已经扫描过这个图纸");
+    function isPaperUrl(u) {
+      try {
+        const host = (u.hostname || "").toLowerCase();
+        const path = normalizePath(u.pathname || "");
+        const hasParams = u.searchParams.get("so") && u.searchParams.get("item");
+        return host === ALLOWED_HOST && path === ALLOWED_PATH && hasParams;
+      } catch (e) {
+        return false;
       }
     }
 
-    function getQrBoxSize(viewfinderWidth) {
-      return Math.floor(viewfinderWidth * 0.7); 
+    function formatDataFromUrl(u) {
+      const normalizedUrl = u.origin + normalizePath(u.pathname) + (u.search || "");
+      let salesOrder = u.searchParams.get("so") || "";
+      let item = u.searchParams.get("item") || "";
+      let name = u.searchParams.get("name") || "";
+      let unit = u.searchParams.get("unit") || "";
+      let dim = u.searchParams.get("dim") || "";
+
+      if (salesOrder) salesOrder = salesOrder.replace(/^SO-?/i, "SO-");
+      if (dim) dim = dim.replace(/x/g, " x ") + " mm";
+      if (name) name = decodeURIComponent(name).replace(/\+/g, " ");
+      return { salesOrder, item, name, unit, dim, url: normalizedUrl };
     }
 
+    function displayCurrent(data) {
+      currentInfo.innerHTML = `
+        <b>Sales Order:</b> ${data.salesOrder || "-"} <br>
+        <b>Item No.:</b> ${data.item || "-"} <br>
+        <b>Name:</b> ${data.name || "-"} <br>
+        <b>Units:</b> ${data.unit || "-"} <br>
+        <b>Dimension:</b> ${data.dim || "-"} <br>
+        <b>Link:</b> <a href="${data.url}" target="_blank" rel="noopener">${data.url}</a>
+      `;
+    }
+
+    function addToList(data) {
+      if (scannedLinks.has(data.url)) {
+        const now = Date.now();
+        if (now - lastDuplicateTime > 3000) {
+          lastDuplicateTime = now;
+          showToast("已扫描过该图纸", "#ff9800");
+        }
+        return;
+      }
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${data.salesOrder}</td>
+        <td>${data.item}</td>
+        <td>${data.name}</td>
+        <td>${data.unit}</td>
+        <td>${data.dim}</td>
+        <td><a href="${data.url}" target="_blank" rel="noopener">Link</a></td>
+      `;
+      resultTbody.prepend(tr);
+      scannedLinks.add(data.url);
+      updateCount();
+      showToast("已加入扫描记录", "#007bff");
+    }
+
+    function handleScannedText(text) {
+      if (!text) return;
+      text = text.trim();
+      try {
+        const u = new URL(text);
+        if (isPaperUrl(u)) {
+          const data = formatDataFromUrl(u);
+          displayCurrent(data);
+          addToList(data);
+        } else {
+          // 非图纸：显示当前信息并 toast 提示（保留忽略逻辑）
+          currentInfo.textContent = "非图纸 QR，已忽略: " + text;
+          showToast("非图纸 QR 已忽略", "#333");
+        }
+      } catch (e) {
+        currentInfo.textContent = "无效的 QR 内容: " + text;
+        showToast("无效的 QR 内容", "#e74c3c");
+      }
+    }
+
+    // 计算 focus box 大小：reader 宽度的 70%
     function resizeFocusBox() {
-      const scannerWidth = document.getElementById("scanner").offsetWidth;
-      const size = getQrBoxSize(scannerWidth);
-      const focusBox = document.getElementById("focusBox");
+      const rw = Math.max(80, reader.clientWidth); // 最小保障
+      const size = Math.floor(rw * 0.7);
       focusBox.style.width = size + "px";
       focusBox.style.height = size + "px";
+      // 保证阴影覆盖（如果想更暗可调整 alpha）
+      focusBox.style.boxShadow = "0 0 0 9999px rgba(0,0,0,0.45)";
     }
 
-    window.addEventListener("resize", resizeFocusBox);
+    window.addEventListener("resize", () => {
+      resizeFocusBox();
+    });
 
-    const html5QrCode = new Html5Qrcode("reader");
-
-    const config = {
-      fps: 7,
-      aspectRatio: 1.0,
-      qrbox: (viewfinderWidth, viewfinderHeight) => {
-        let boxSize = getQrBoxSize(viewfinderWidth);
-        return { width: boxSize, height: boxSize };
-      },
-      disableFlip: true
+    // qrbox function：html5-qrcode 会传入 viewfinderWidth/Height，
+    // 但我们优先使用 reader.clientWidth（更符合 UI 的实际尺寸）
+    const qrboxFunc = (viewfinderWidth, viewfinderHeight) => {
+      const rw = reader.clientWidth || viewfinderWidth || Math.min(viewfinderWidth, viewfinderHeight);
+      const size = Math.floor(rw * 0.7);
+      return { width: size, height: size };
     };
 
-    function startScanner() {
-      Html5Qrcode.getCameras().then(devices => {
-        if (devices && devices.length) {
-          const cameraId = devices[0].id;
-          html5QrCode.start(
-            cameraId,
-            config,
-            (decodedText, decodedResult) => {
-              updateScanList(decodedText);
-            },
-            (errorMessage) => {}
-          ).then(() => {
-            resizeFocusBox();
-          }).catch(err => {
-            console.error("启动扫描失败", err);
-          });
+    // Scanner 参数（调优：提升识别小/模糊 QR）
+    const scannerConfig = {
+      fps: 7,
+      aspectRatio: 1.0,
+      qrbox: qrboxFunc,
+      disableFlip: true,
+      // verbose: false
+    };
+
+    // 启动相机
+    function startScanning() {
+      Html5Qrcode.getCameras().then(cameras => {
+        if (!cameras || cameras.length === 0) {
+          showToast("未找到相机设备", "#e74c3c");
+          return;
         }
+        // 优先选择后置摄像头（label 含 back 或 rear），否则第一个
+        let camera = cameras[0];
+        for (const c of cameras) {
+          const lbl = (c.label || "").toLowerCase();
+          if (lbl.includes("back") || lbl.includes("rear") || lbl.includes("后")) { camera = c; break; }
+        }
+
+        // 以设备 id 启动（使用 deviceId 精确约束以避免浏览器分配默认摄像头差异）
+        const constraints = { deviceId: { exact: camera.id }, width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "environment" };
+
+        html5QrCode.start(
+          constraints,
+          scannerConfig,
+          (decodedText, decodedResult) => {
+            // 成功回调（每次解析到码）
+            handleScannedText(decodedText);
+          },
+          (errorMessage) => {
+            // 每帧错误回调（不需要每次显示）
+            // console.debug("scan attempt:", errorMessage);
+          }
+        ).then(() => {
+          // 启动成功后确保 focus box 大小正确
+          resizeFocusBox();
+        }).catch(err => {
+          console.error("启动扫描失败:", err);
+          showToast("相机启动失败，请确认已允许浏览器使用相机", "#e74c3c");
+        });
       }).catch(err => {
-        console.error("摄像头获取失败", err);
+        console.error("获取相机失败:", err);
+        showToast("获取相机失败", "#e74c3c");
       });
     }
 
-    startScanner();
+    // 手动输入支持（按 Enter）
+    scannerInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        const text = scannerInput.value.trim();
+        if (text) handleScannedText(text);
+        scannerInput.value = "";
+      }
+    });
+
+    // 停止相机（页面卸载）
+    window.addEventListener("beforeunload", () => {
+      if (html5QrCode && html5QrCode.getState && html5QrCode.getState() !== Html5QrcodeScannerStateEnum?.STOPPED) {
+        html5QrCode.stop().catch(()=>{});
+      }
+    });
+
+    // 初次启动
+    startScanning();
+    // 保证 UI first render 后 resize focus box
+    window.setTimeout(resizeFocusBox, 400);
   </script>
 </body>
 </html>
+
 
 
 
