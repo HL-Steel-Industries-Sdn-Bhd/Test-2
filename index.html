@@ -7,206 +7,344 @@
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body {
-      font-family: Arial, sans-serif;
       margin: 0;
-      background: #f9f9f9;
+      font-family: "Segoe UI", Arial, sans-serif;
       display: flex;
-      flex-direction: row; /* 横排布局 */
       height: 100vh;
-      overflow: hidden;
+      background: #f4f6f9;
     }
-    #leftPanel, #rightPanel {
-      padding: 2vw;
-      box-sizing: border-box;
-    }
+    /* 左边扫码区 */
     #leftPanel {
-      flex: 1;
+      flex: 0 0 35%;
+      background: linear-gradient(180deg, #fff, #f1f4ff);
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: flex-start;
-      background: #fff;
-      box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+      padding: 2rem 1rem;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.08);
     }
-    #rightPanel {
-      flex: 1.2;
-      overflow-y: auto;
-    }
-    h2 {
-      color: #2c3e50;
-      font-size: 2vw;
-      margin: 2vh 0;
+    #leftPanel h2 {
+      margin: 0 0 1rem;
+      color: #34495e;
     }
     #reader {
       width: 90%;
-      max-width: 400px;
-      aspect-ratio: 1;
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    input#scannerInput {
-      margin-top: 20px;
-      font-size: 16px;
-      padding: 10px;
-      width: 80%;
       max-width: 350px;
-      text-align: center;
+      aspect-ratio: 1;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+      background: #fff;
     }
-    #warningMsg {
-      margin-top: 10px;
+    #scannerInput {
+      margin-top: 1rem;
+      padding: 0.6rem;
+      font-size: 15px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      width: 85%;
+    }
+
+    /* 右边结果区 */
+    #rightPanel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    #currentBox {
+      background: #fff;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid #ddd;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #currentBox h3 {
+      margin: 0 0 0.5rem;
+      color: #2c3e50;
+    }
+    #currentInfo {
       font-size: 14px;
-      color: #e74c3c;
-      opacity: 0;
-      transition: opacity 0.5s;
+      color: #34495e;
     }
     #countBox {
-      margin-top: 15px;
-      font-size: 16px;
-      font-weight: bold;
-      color: #FFA500;
+      color:#ff9800;font-weight:bold;
     }
+    #listBox {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    /* 表格 */
     table {
-      margin: 20px auto;
       border-collapse: collapse;
-      width: 95%;
+      width: 100%;
       background: #fff;
       border-radius: 8px;
       overflow: hidden;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
     th, td {
-      border: 1px solid #ddd;
-      padding: 8px 10px;
+      padding: 10px;
       font-size: 14px;
-      text-align: left;
+      border: 1px solid #eee;
     }
     th {
-      background: #f1f1f1;
+      background: #f8f9fa;
+      font-weight: bold;
     }
-    a {
-      color: #3498db;
-      text-decoration: none;
+    tr:nth-child(even) {
+      background: #fafafa;
     }
-    a:hover {
-      text-decoration: underline;
+
+    /* toast 提示 */
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      transform: translateY(20px);
+      pointer-events: none;
+      z-index: 9999;
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* small responsive tweak */
+    @media (max-width: 900px) {
+      #leftPanel { flex: 0 0 45%; }
+      #reader { max-width: 280px; }
     }
   </style>
 </head>
 <body>
-  <!-- 左边扫码区 -->
+  <!-- 左边固定扫码区 -->
   <div id="leftPanel">
     <h2>Welcome Angelina (A0001)</h2>
     <div id="reader"></div>
-    <!-- 给电脑扫码枪用的输入框 -->
     <input type="text" id="scannerInput" placeholder="请扫描图纸上的 QR Code" autofocus>
-    <div id="warningMsg">Bro,冷静! 这个你Scan过了</div>
-    <div id="countBox">已扫描 0 张图纸</div>
   </div>
 
   <!-- 右边结果区 -->
   <div id="rightPanel">
-    <table id="resultTable">
-      <thead>
-        <tr>
-          <th>Sales Order No.</th>
-          <th>Item No.</th>
-          <th>Name</th>
-          <th>Units</th>
-          <th>Dimension</th>
-          <th>Link</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <!-- 上方固定：当前相机对着的二维码资料 + 已扫描数 -->
+    <div id="currentBox">
+      <h3>当前扫描结果</h3>
+      <div id="currentInfo">等待扫描...</div>
+      <div id="countBox">已扫描 0 张图纸</div>
+    </div>
+
+    <!-- 下方可滚动：已确认的扫描记录 -->
+    <div id="listBox">
+      <table id="resultTable">
+        <thead>
+          <tr>
+            <th>Sales Order No.</th>
+            <th>Item No.</th>
+            <th>Name</th>
+            <th>Units</th>
+            <th>Dimension</th>
+            <th>Link</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 
+  <!-- toast -->
+  <div id="toast" role="status" aria-live="polite">提示</div>
+
   <script>
+    // ---------- 配置区域 ----------
+    const ALLOWED_HOST = "yourdomain.github.io"; // 允许的 host（严格匹配）
+    const ALLOWED_PATH = "/repo";               // 允许的路径（不区分尾部 /）
+    // --------------------------------
+
     const html5QrCode = new Html5Qrcode("reader");
     const input = document.getElementById("scannerInput");
-    const warning = document.getElementById("warningMsg");
-    const resultTable = document.getElementById("resultTable").querySelector("tbody");
+    const toast = document.getElementById("toast");
+    const resultTable = document.querySelector("#resultTable tbody");
     const countBox = document.getElementById("countBox");
+    const currentInfo = document.getElementById("currentInfo");
     const scannedLinks = new Set();
+
+    // 冷却记录（比如重复扫描提示 3 秒冷却）
+    const lastToastTimes = {
+      duplicate: 0
+    };
+    let toastTimeout = null;
+
+    function showToast(msg, type = "info") {
+      // type: "info" | "warn" | "error"
+      toast.textContent = msg;
+      // 设置背景颜色
+      if (type === "info") {
+        toast.style.backgroundColor = "#007bff"; // blue
+      } else if (type === "warn") {
+        toast.style.backgroundColor = "#ff9800"; // orange
+      } else if (type === "error") {
+        toast.style.backgroundColor = "#e74c3c"; // red
+      } else {
+        toast.style.backgroundColor = "#333";
+      }
+
+      toast.classList.add("show");
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove("show");
+        toastTimeout = null;
+      }, 2000);
+    }
 
     function updateCount() {
       countBox.textContent = "已扫描 " + scannedLinks.size + " 张图纸";
     }
 
-    function displayResult(url) {
-      if (scannedLinks.has(url)) {
-        warning.textContent = "已扫描过该图纸";
-        warning.style.opacity = "1";
-        setTimeout(() => { warning.style.opacity = "0"; }, 2000);
-        return;
-      }
+    function normalizePath(path) {
+      return path.replace(/\/+$/, ""); // 去掉尾部斜杠
+    }
+
+    function isPaperUrl(u) {
       try {
-        let u = new URL(url);
-        let salesOrder = u.searchParams.get("so") || "";
-        let item = u.searchParams.get("item") || "";
-        let name = u.searchParams.get("name") || "";
-        let unit = u.searchParams.get("unit") || "";
-        let dim = u.searchParams.get("dim") || "";
-
-        // 格式化输出
-        if (salesOrder) salesOrder = salesOrder.replace(/^SO/, "SO-");
-        if (dim) dim = dim.replace(/x/g, " x ") + " mm";
-        if (name) name = name.replace(/\+/g, " ");
-
-        let row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${salesOrder}</td>
-          <td>${item}</td>
-          <td>${name}</td>
-          <td>${unit}</td>
-          <td>${dim}</td>
-          <td><a href="${url}" target="_blank">Link</a></td>
-        `;
-        resultTable.appendChild(row);
-        scannedLinks.add(url);
-        updateCount();
+        const host = (u.hostname || "").toLowerCase();
+        const path = normalizePath(u.pathname || "");
+        // 必须完全匹配 host + path，并且至少含 so 和 item 两个查询参数
+        const hasParams = u.searchParams.get("so") && u.searchParams.get("item");
+        return host === ALLOWED_HOST && path === ALLOWED_PATH && hasParams;
       } catch (e) {
-        alert("无效的链接: " + url);
+        return false;
       }
     }
 
-    function handleScan(text) {
-      const currentUrl = window.location.href.split("#")[0];
-      if (text === currentUrl) {
-        warning.textContent = "Bro,冷静! 这个你Scan过了";
-        warning.style.opacity = "1";
-        setTimeout(() => { warning.style.opacity = "0"; }, 2000);
+    function formatData(u) {
+      // 标准化 url 作为去重 key（去掉 hash）
+      const normalizedUrl = u.origin + normalizePath(u.pathname) + (u.search || "");
+      let salesOrder = u.searchParams.get("so") || "";
+      let item = u.searchParams.get("item") || "";
+      let name = u.searchParams.get("name") || "";
+      let unit = u.searchParams.get("unit") || "";
+      let dim = u.searchParams.get("dim") || "";
+
+      if (salesOrder) {
+        // 例：SO2345 -> SO-2345
+        salesOrder = salesOrder.replace(/^SO-?/i, "SO-");
+      }
+      if (dim) {
+        dim = dim.replace(/x/g, " x ") + " mm";
+      }
+      if (name) {
+        // URL encoding 下的 + 变成空格
+        name = name.replace(/\+/g, " ");
+      }
+
+      return {
+        salesOrder,
+        item,
+        name,
+        unit,
+        dim,
+        url: normalizedUrl
+      };
+    }
+
+    function displayCurrent(data) {
+      currentInfo.innerHTML = `
+        <b>Sales Order:</b> ${data.salesOrder || "-"} <br>
+        <b>Item No.:</b> ${data.item || "-"} <br>
+        <b>Name:</b> ${data.name || "-"} <br>
+        <b>Units:</b> ${data.unit || "-"} <br>
+        <b>Dimension:</b> ${data.dim || "-"} <br>
+        <b>Link:</b> <a href="${data.url}" target="_blank" rel="noopener">Link</a>
+      `;
+    }
+
+    function addToList(data) {
+      // 去重：使用标准化的 data.url
+      if (scannedLinks.has(data.url)) {
+        // 重复冷却 3 秒
+        const now = Date.now();
+        if (now - lastToastTimes.duplicate > 3000) {
+          lastToastTimes.duplicate = now;
+          showToast("已扫描过该图纸", "warn");
+        }
         return;
       }
-      if (text.startsWith("http://") || text.startsWith("https://")) {
-        displayResult(text);
-      } else {
-        alert("无效的 QR 内容: " + text);
+      let row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${data.salesOrder}</td>
+        <td>${data.item}</td>
+        <td>${data.name}</td>
+        <td>${data.unit}</td>
+        <td>${data.dim}</td>
+        <td><a href="${data.url}" target="_blank" rel="noopener">Link</a></td>
+      `;
+      resultTable.appendChild(row);
+      scannedLinks.add(data.url);
+      updateCount();
+      showToast("已加入扫描记录", "info");
+    }
+
+    function handleScan(text) {
+      if (!text) return;
+      // 有些扫描器可能会抓到末尾的换行，先 trim
+      text = text.trim();
+
+      try {
+        const u = new URL(text);
+
+        if (isPaperUrl(u)) {
+          // 是允许的图纸链接
+          const data = formatData(u);
+          displayCurrent(data);
+          addToList(data);
+        } else {
+          // 非图纸的 URL（包含当前页面自己产生的链接）
+          currentInfo.textContent = "非图纸 QR，已忽略: " + text;
+          showToast("非图纸 QR 已忽略", "info");
+        }
+      } catch (err) {
+        // 不是有效 URL
+        currentInfo.textContent = "无效的 QR 内容: " + text;
+        showToast("无效的 QR 内容", "error");
       }
     }
 
     function startScanning() {
       html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 20, qrbox: function(viewfinderWidth, viewfinderHeight) {
-            let minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            return { width: minEdge * 0.8, height: minEdge * 0.8 };
+        {
+          fps: 15,
+          qrbox: (vw, vh) => {
+            // qrbox 设为可变大小，保证在手机上既不会太小也不会太大
+            let minEdge = Math.min(vw, vh);
+            return { width: Math.round(minEdge * 0.7), height: Math.round(minEdge * 0.7) };
           }
         },
         (decodedText) => handleScan(decodedText),
-        () => {}
+        (errorMessage) => {
+          // 可选：扫描失败回调（每帧）
+          // console.debug("扫描尝试:", errorMessage);
+        }
       ).catch(err => {
         console.error("扫描启动失败:", err);
+        showToast("相机启动失败，请检查权限或在设置中允许相机访问", "error");
       });
     }
 
     startScanning();
 
-    input.focus();
-    input.addEventListener("blur", () => {
-      setTimeout(() => input.focus(), 100);
-    });
-
+    // 输入框也能手动输入二维码文本（按 Enter）
     input.addEventListener("keypress", function(e) {
       if (e.key === "Enter") {
         const text = input.value.trim();
@@ -214,9 +352,17 @@
         input.value = "";
       }
     });
+
+    // 可选：页面卸载或切换时停止相机
+    window.addEventListener("beforeunload", function () {
+      if (html5QrCode && html5QrCode.getState && html5QrCode.getState() !== /* STOPPED */ 2) {
+        html5QrCode.stop().catch(() => {});
+      }
+    });
   </script>
 </body>
 </html>
+
 
 
 
