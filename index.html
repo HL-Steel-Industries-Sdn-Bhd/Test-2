@@ -11,65 +11,82 @@
       margin: 0;
       background: #f9f9f9;
       display: flex;
-      flex-direction: row; /* 横排布局 */
+      flex-direction: row;
       height: 100vh;
-      overflow: hidden;
     }
-    #leftPanel, #rightPanel {
-      padding: 2vw;
-      box-sizing: border-box;
-    }
-    #leftPanel {
-      flex: 1;
+    /* 左边 scanner 区 */
+    #left {
+      width: 40%;
+      min-width: 320px;
+      background: #fff;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      background: #fff;
-      box-shadow: 2px 0 8px rgba(0,0,0,0.1);
-    }
-    #rightPanel {
-      flex: 1.2;
-      overflow-y: auto;
+      padding: 10px;
+      box-shadow: 2px 0 6px rgba(0,0,0,0.1);
     }
     h2 {
       color: #2c3e50;
-      font-size: 2vw;
-      margin: 2vh 0;
+      font-size: 2rem;
+      margin: 1rem 0;
     }
     #reader {
       width: 90%;
-      max-width: 400px;
       aspect-ratio: 1;
-      background: #fff;
       border-radius: 12px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      background: #fafafa;
     }
     input#scannerInput {
-      margin-top: 20px;
+      margin-top: 15px;
       font-size: 16px;
-      padding: 10px;
-      width: 80%;
-      max-width: 350px;
+      padding: 8px;
+      width: 90%;
       text-align: center;
     }
     #warningMsg {
-      margin-top: 10px;
+      margin-top: 8px;
       font-size: 14px;
       color: #e74c3c;
       opacity: 0;
       transition: opacity 0.5s;
     }
+    /* 右边结果区 */
+    #right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      overflow: hidden;
+    }
+    /* 上方固定格 */
+    #currentBox {
+      background: #fff;
+      border-radius: 8px;
+      padding: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
     #countBox {
-      margin-top: 15px;
-      font-size: 16px;
       font-weight: bold;
       color: #FFA500;
+      margin-bottom: 6px;
+    }
+    #currentData {
+      font-size: 14px;
+      color: #2c3e50;
+      line-height: 1.4;
+    }
+    /* 下方可滑动 */
+    #listBox {
+      flex: 1;
+      overflow-y: auto;
     }
     table {
-      margin: 20px auto;
+      width: 100%;
       border-collapse: collapse;
-      width: 95%;
       background: #fff;
       border-radius: 8px;
       overflow: hidden;
@@ -77,9 +94,8 @@
     }
     th, td {
       border: 1px solid #ddd;
-      padding: 8px 10px;
+      padding: 8px;
       font-size: 14px;
-      text-align: left;
     }
     th {
       background: #f1f1f1;
@@ -88,37 +104,40 @@
       color: #3498db;
       text-decoration: none;
     }
-    a:hover {
-      text-decoration: underline;
-    }
   </style>
 </head>
 <body>
-  <!-- 左边扫码区 -->
-  <div id="leftPanel">
+  <!-- 左边 -->
+  <div id="left">
     <h2>Welcome Angelina (A0001)</h2>
     <div id="reader"></div>
-    <!-- 给电脑扫码枪用的输入框 -->
     <input type="text" id="scannerInput" placeholder="请扫描图纸上的 QR Code" autofocus>
     <div id="warningMsg">Bro,冷静! 这个你Scan过了</div>
-    <div id="countBox">已扫描 0 张图纸</div>
   </div>
 
-  <!-- 右边结果区 -->
-  <div id="rightPanel">
-    <table id="resultTable">
-      <thead>
-        <tr>
-          <th>Sales Order No.</th>
-          <th>Item No.</th>
-          <th>Name</th>
-          <th>Units</th>
-          <th>Dimension</th>
-          <th>Link</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+  <!-- 右边 -->
+  <div id="right">
+    <!-- 固定格 -->
+    <div id="currentBox">
+      <div id="countBox">已扫描 0 张图纸</div>
+      <div id="currentData">当前相机未检测到有效 QR</div>
+    </div>
+    <!-- 可滑动 list -->
+    <div id="listBox">
+      <table id="resultTable">
+        <thead>
+          <tr>
+            <th>Sales Order No.</th>
+            <th>Item No.</th>
+            <th>Name</th>
+            <th>Units</th>
+            <th>Dimension</th>
+            <th>Link</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 
   <script>
@@ -127,10 +146,21 @@
     const warning = document.getElementById("warningMsg");
     const resultTable = document.getElementById("resultTable").querySelector("tbody");
     const countBox = document.getElementById("countBox");
+    const currentData = document.getElementById("currentData");
     const scannedLinks = new Set();
 
     function updateCount() {
       countBox.textContent = "已扫描 " + scannedLinks.size + " 张图纸";
+    }
+
+    function displayCurrentInfo(data) {
+      currentData.innerHTML = `
+        <div><b>Sales Order:</b> ${data.salesOrder}</div>
+        <div><b>Item:</b> ${data.item}</div>
+        <div><b>Name:</b> ${data.name}</div>
+        <div><b>Units:</b> ${data.unit}</div>
+        <div><b>Dimension:</b> ${data.dim}</div>
+      `;
     }
 
     function displayResult(url) {
@@ -144,14 +174,12 @@
         let u = new URL(url);
         let salesOrder = u.searchParams.get("so") || "";
         let item = u.searchParams.get("item") || "";
-        let name = u.searchParams.get("name") || "";
+        let name = (u.searchParams.get("name") || "").replace(/\+/g, " ");
         let unit = u.searchParams.get("unit") || "";
         let dim = u.searchParams.get("dim") || "";
 
-        // 格式化输出
-        if (salesOrder) salesOrder = salesOrder.replace(/^SO/, "SO-");
-        if (dim) dim = dim.replace(/x/g, " x ") + " mm";
-        if (name) name = name.replace(/\+/g, " ");
+        let data = {salesOrder, item, name, unit, dim};
+        displayCurrentInfo(data);
 
         let row = document.createElement("tr");
         row.innerHTML = `
@@ -188,24 +216,16 @@
     function startScanning() {
       html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 20, qrbox: function(viewfinderWidth, viewfinderHeight) {
-            let minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            return { width: minEdge * 0.8, height: minEdge * 0.8 };
-          }
-        },
+        { fps: 15, qrbox: w => ({ width: w * 0.7, height: w * 0.7 }) },
         (decodedText) => handleScan(decodedText),
         () => {}
-      ).catch(err => {
-        console.error("扫描启动失败:", err);
-      });
+      ).catch(err => console.error("扫描启动失败:", err));
     }
 
     startScanning();
 
     input.focus();
-    input.addEventListener("blur", () => {
-      setTimeout(() => input.focus(), 100);
-    });
+    input.addEventListener("blur", () => setTimeout(() => input.focus(), 100));
 
     input.addEventListener("keypress", function(e) {
       if (e.key === "Enter") {
@@ -217,3 +237,4 @@
   </script>
 </body>
 </html>
+
