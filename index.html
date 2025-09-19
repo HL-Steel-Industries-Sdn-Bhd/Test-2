@@ -13,10 +13,10 @@
       display: flex;
       flex-direction: row; /* 横排布局 */
       height: 100vh;
-      overflow: hidden;   /* 避免双重滚动条 */
+      overflow: hidden;
     }
     #leftPanel {
-      flex: 0 0 40%;      /* 固定宽度比例（40%） */
+      flex: 0 0 40%;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -24,17 +24,27 @@
       padding: 2vw;
       background: #fff;
       box-shadow: 2px 0 8px rgba(0,0,0,0.1);
-      position: sticky;   /* 关键！左边固定 */
+      position: sticky;
       top: 0;
-      height: 100vh;      /* 占满屏幕高度 */
+      height: 100vh;
       box-sizing: border-box;
     }
     #rightPanel {
       flex: 1;
-      padding: 2vw;
+      display: flex;
+      flex-direction: column;
       height: 100vh;
-      overflow-y: auto;   /* 右边可以滑动 */
-      box-sizing: border-box;
+    }
+    #currentBox {
+      flex: 0 0 auto;
+      padding: 1rem;
+      background: #eef;
+      border-bottom: 2px solid #ccc;
+    }
+    #listBox {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
     }
     h2 {
       color: #2c3e50;
@@ -71,7 +81,6 @@
       color: #FFA500;
     }
     table {
-      margin: 20px auto;
       border-collapse: collapse;
       width: 100%;
       background: #fff;
@@ -107,21 +116,30 @@
     <div id="countBox">已扫描 0 张图纸</div>
   </div>
 
-  <!-- 右边可滚动结果区 -->
+  <!-- 右边结果区 -->
   <div id="rightPanel">
-    <table id="resultTable">
-      <thead>
-        <tr>
-          <th>Sales Order No.</th>
-          <th>Item No.</th>
-          <th>Name</th>
-          <th>Units</th>
-          <th>Dimension</th>
-          <th>Link</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <!-- 上方固定：当前相机对着的二维码资料 -->
+    <div id="currentBox">
+      <h3>当前扫描结果</h3>
+      <div id="currentInfo">等待扫描...</div>
+    </div>
+
+    <!-- 下方可滚动：已确认的扫描记录 -->
+    <div id="listBox">
+      <table id="resultTable">
+        <thead>
+          <tr>
+            <th>Sales Order No.</th>
+            <th>Item No.</th>
+            <th>Name</th>
+            <th>Units</th>
+            <th>Dimension</th>
+            <th>Link</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 
   <script>
@@ -130,76 +148,88 @@
     const warning = document.getElementById("warningMsg");
     const resultTable = document.getElementById("resultTable").querySelector("tbody");
     const countBox = document.getElementById("countBox");
+    const currentInfo = document.getElementById("currentInfo");
     const scannedLinks = new Set();
 
     function updateCount() {
       countBox.textContent = "已扫描 " + scannedLinks.size + " 张图纸";
     }
 
-    function displayResult(url) {
-      if (scannedLinks.has(url)) {
+    function formatData(u, url) {
+      let salesOrder = u.searchParams.get("so") || "";
+      let item = u.searchParams.get("item") || "";
+      let name = u.searchParams.get("name") || "";
+      let unit = u.searchParams.get("unit") || "";
+      let dim = u.searchParams.get("dim") || "";
+
+      if (salesOrder) salesOrder = salesOrder.replace(/^SO/, "SO-");
+      if (dim) dim = dim.replace(/x/g, " x ") + " mm";
+      if (name) name = name.replace(/\+/g, " ");
+
+      return { salesOrder, item, name, unit, dim, url };
+    }
+
+    function displayCurrent(data) {
+      currentInfo.innerHTML = `
+        <b>Sales Order:</b> ${data.salesOrder || "-"} <br>
+        <b>Item No.:</b> ${data.item || "-"} <br>
+        <b>Name:</b> ${data.name || "-"} <br>
+        <b>Units:</b> ${data.unit || "-"} <br>
+        <b>Dimension:</b> ${data.dim || "-"} <br>
+        <b>Link:</b> <a href="${data.url}" target="_blank">Link</a>
+      `;
+    }
+
+    function addToList(data) {
+      if (scannedLinks.has(data.url)) {
         warning.textContent = "已扫描过该图纸";
         warning.style.opacity = "1";
         setTimeout(() => { warning.style.opacity = "0"; }, 2000);
         return;
       }
-      try {
-        let u = new URL(url);
-        let salesOrder = u.searchParams.get("so") || "";
-        let item = u.searchParams.get("item") || "";
-        let name = u.searchParams.get("name") || "";
-        let unit = u.searchParams.get("unit") || "";
-        let dim = u.searchParams.get("dim") || "";
-
-        if (salesOrder) salesOrder = salesOrder.replace(/^SO/, "SO-");
-        if (dim) dim = dim.replace(/x/g, " x ") + " mm";
-        if (name) name = name.replace(/\+/g, " ");
-
-        let row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${salesOrder}</td>
-          <td>${item}</td>
-          <td>${name}</td>
-          <td>${unit}</td>
-          <td>${dim}</td>
-          <td><a href="${url}" target="_blank">Link</a></td>
-        `;
-        resultTable.appendChild(row);
-        scannedLinks.add(url);
-        updateCount();
-      } catch (e) {
-        alert("无效的链接: " + url);
-      }
+      let row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${data.salesOrder}</td>
+        <td>${data.item}</td>
+        <td>${data.name}</td>
+        <td>${data.unit}</td>
+        <td>${data.dim}</td>
+        <td><a href="${data.url}" target="_blank">Link</a></td>
+      `;
+      resultTable.appendChild(row);
+      scannedLinks.add(data.url);
+      updateCount();
     }
 
     function handleScan(text) {
       const currentUrl = window.location.href.split("#")[0];
-      if (text === currentUrl) {
-        warning.textContent = "Bro,冷静! 这个你Scan过了";
-        warning.style.opacity = "1";
-        setTimeout(() => { warning.style.opacity = "0"; }, 2000);
-        return;
-      }
+      if (text === currentUrl) return;
+
       if (text.startsWith("http://") || text.startsWith("https://")) {
-        displayResult(text);
+        try {
+          let u = new URL(text);
+          let data = formatData(u, text);
+          displayCurrent(data);
+          addToList(data);
+        } catch (e) {
+          currentInfo.textContent = "无效的链接: " + text;
+        }
       } else {
-        alert("无效的 QR 内容: " + text);
+        currentInfo.textContent = "无效的 QR 内容: " + text;
       }
     }
 
     function startScanning() {
       html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 20, qrbox: function(viewfinderWidth, viewfinderHeight) {
-            let minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+        { fps: 20, qrbox: (vw, vh) => {
+            let minEdge = Math.min(vw, vh);
             return { width: minEdge * 0.8, height: minEdge * 0.8 };
           }
         },
         (decodedText) => handleScan(decodedText),
         () => {}
-      ).catch(err => {
-        console.error("扫描启动失败:", err);
-      });
+      ).catch(err => console.error("扫描启动失败:", err));
     }
 
     startScanning();
@@ -208,7 +238,6 @@
     input.addEventListener("blur", () => {
       setTimeout(() => input.focus(), 100);
     });
-
     input.addEventListener("keypress", function(e) {
       if (e.key === "Enter") {
         const text = input.value.trim();
@@ -219,6 +248,7 @@
   </script>
 </body>
 </html>
+
 
 
 
