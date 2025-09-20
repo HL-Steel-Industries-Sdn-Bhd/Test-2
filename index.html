@@ -1,311 +1,365 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-  <meta charset="utf-8" />
-  <title>工人扫码 - Angelina</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
-  <style>
-    :root { --left-w:35%; --focus-border:3px; --overlay-dark: rgba(0,0,0,0.45); }
-    html,body{height:100%;margin:0;font-family:"Segoe UI",Arial,sans-serif;}
-    body { display:flex; height:100vh; background:#f4f6f9; overflow:hidden; }
+<meta charset="UTF-8">
+<title>工人扫码 - Angelina</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+body {
+margin: 0;
+font-family: "Segoe UI", Arial, sans-serif;
+display: flex;
+height: 100vh;
+background: #f4f6f9;
+}
+/* 左边扫码区 */
+#leftPanel {
+flex: 0 0 35%;
+background: linear-gradient(180deg, #fff, #f1f4ff);
+display: flex;
+flex-direction: column;
+align-items: center;
+padding: 2rem 1rem;
+box-shadow: 2px 0 8px rgba(0,0,0,0.08);
+}
+#leftPanel h2 {
+margin: 0 0 1rem;
+color: #34495e;
+}
+#reader {
+width: 90%;
+max-width: 350px;
+aspect-ratio: 1;
+border-radius: 12px;
+box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+background: #fff;
+}
+#scannerInput {
+margin-top: 1rem;
+padding: 0.6rem;
+font-size: 15px;
+border: 1px solid #ccc;
+border-radius: 6px;
+width: 85%;
+}
 
-    /* 左侧扫码区（固定宽度百分比） */
-    #leftPanel {
-      flex: 0 0 var(--left-w);
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      padding:18px 12px;
-      gap:12px;
-      background: linear-gradient(180deg,#fff,#f1f4ff);
-      box-shadow: 2px 0 8px rgba(0,0,0,0.06);
-    }
-    #leftPanel h2 { margin:0;color:#34495e;font-size:16px; }
+/* 右边结果区 */
+#rightPanel {
+flex: 1;
+display: flex;
+flex-direction: column;
+}
+#currentBox {
+background: #fff;
+padding: 1rem 1.5rem;
+border-bottom: 1px solid #ddd;
+position: sticky;
+top: 0;
+z-index: 5;
+display: flex;
+flex-direction: column;
+gap: 8px;
+}
+#currentBox h3 {
+margin: 0 0 0.5rem;
+color: #2c3e50;
+}
+#currentInfo {
+font-size: 14px;
+color: #34495e;
+}
+#countBox {
+color:#ff9800;font-weight:bold;
+}
+#listBox {
+flex: 1;
+overflow-y: auto;
+padding: 1rem;
+}
 
-    /* reader（正方形 viewfinder）*/
-    #reader {
-      width:92%;
-      max-width:520px;
-      aspect-ratio: 1 / 1; /* 保证正方形 */
-      border-radius:12px;
-      overflow:hidden;
-      position:relative;
-      background:#000;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-    }
-    /* 让 html5-qrcode 插入的 video/canvas 填满 reader */
-    #reader video, #reader canvas {
-      width:100% !important;
-      height:100% !important;
-      object-fit: cover !important;
-      display:block;
-    }
+/* 表格 */
+table {
+border-collapse: collapse;
+width: 100%;
+background: #fff;
+border-radius: 8px;
+overflow: hidden;
+}
+th, td {
+padding: 10px;
+font-size: 14px;
+border: 1px solid #eee;
+}
+th {
+background: #f8f9fa;
+font-weight: bold;
+}
+tr:nth-child(even) {
+background: #fafafa;
+}
 
-    /* 焦点框与暗化外部 */
-    .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
-    #focusBox {
-      box-sizing:border-box;
-      border: var(--focus-border) solid #00e676;
-      border-radius:8px;
-      /* 暗化框外 */
-      box-shadow: 0 0 0 9999px var(--overlay-dark);
-      pointer-events:none;
-      transition: width .12s, height .12s;
-    }
+/* toast 提示 */
+#toast {
+position: fixed;
+bottom: 20px;
+right: 20px;
+color: #fff;
+padding: 10px 16px;
+border-radius: 6px;
+font-size: 14px;
+box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+opacity: 0;
+transition: opacity 0.3s, transform 0.3s;
+transform: translateY(20px);
+pointer-events: none;
+z-index: 9999;
+}
+#toast.show {
+opacity: 1;
+transform: translateY(0);
+}
 
-    /* 输入框 */
-    #scannerInput {
-      width:92%;
-      padding:8px 10px;
-      border-radius:6px;
-      border:1px solid #ccc;
-      font-size:14px;
-    }
-
-    /* 右侧结果区 */
-    #rightPanel { flex:1; display:flex; flex-direction:column; min-width:0; }
-    #currentBox { background:#fff; padding:12px 16px; border-bottom:1px solid #e6e9ee; position:sticky; top:0; z-index:5; }
-    #currentBox h3 { margin:0 0 6px 0;color:#2c3e50;font-size:16px; }
-    #currentInfo{ color:#34495e; font-size:14px; line-height:1.5; }
-    #countBox{ margin-top:8px;color:#ff9800;font-weight:700; }
-
-    #listBox { flex:1; overflow:auto; padding:12px; background:#f7f9fc; }
-    table{ width:100%; border-collapse:collapse; background:#fff; border-radius:8px; overflow:hidden; }
-    th,td{ padding:10px; font-size:14px; border:1px solid #eee; text-align:left; }
-    th{ background:#fbfbfd; font-weight:700; }
-    tr:nth-child(even){ background:#fafafa; }
-
-    /* toast */
-    #toast { position:fixed; bottom:20px; right:20px; background:#333; color:#fff; padding:10px 14px; border-radius:8px; opacity:0; transform:translateY(8px); transition:opacity .24s, transform .24s; z-index:9999; pointer-events:none; }
-    #toast.show { opacity:1; transform:translateY(0); }
-
-    @media (max-width:900px) {
-      :root { --left-w:40%; }
-      #reader { max-width:420px; }
-    }
-  </style>
+/* small responsive tweak */
+@media (max-width: 900px) {
+#leftPanel { flex: 0 0 45%; }
+#reader { max-width: 280px; }
+}
+</style>
 </head>
 <body>
-  <!-- 左边扫码区 -->
-  <div id="leftPanel">
-    <h2>Welcome Angelina (A0001)</h2>
-    <div id="reader">
-      <!-- html5-qrcode 会在这里插入 video/canvas -->
-      <div class="overlay"><div id="focusBox" aria-hidden="true"></div></div>
-    </div>
-    <input id="scannerInput" placeholder="请扫描图纸或粘贴 URL 后按 Enter" />
-  </div>
+<!-- 左边固定扫码区 -->
+<div id="leftPanel">
+<h2>Welcome Angelina (A0001)</h2>
+<div id="reader"></div>
+<input type="text" id="scannerInput" placeholder="请扫描图纸上的 QR Code" autofocus>
+</div>
 
-  <!-- 右边结果区 -->
-  <div id="rightPanel">
-    <div id="currentBox">
-      <h3>当前扫描结果</h3>
-      <div id="currentInfo">等待扫描...</div>
-      <div id="countBox">已扫描 0 张图纸</div>
-    </div>
+<!-- 右边结果区 -->
+<div id="rightPanel">
+<!-- 上方固定：当前相机对着的二维码资料 + 已扫描数 -->
+<div id="currentBox">
+<h3>当前扫描结果</h3>
+<div id="currentInfo">等待扫描...</div>
+<div id="countBox">已扫描 0 张图纸</div>
+</div>
 
-    <div id="listBox">
-      <table id="resultTable">
-        <thead>
-          <tr><th>Sales Order No.</th><th>Item No.</th><th>Name</th><th>Units</th><th>Dimension</th><th>Link</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
+<!-- 下方可滚动：已确认的扫描记录 -->
+<div id="listBox">
+<table id="resultTable">
+<thead>
+<tr>
+<th>Sales Order No.</th>
+<th>Item No.</th>
+<th>Name</th>
+<th>Units</th>
+<th>Dimension</th>
+<th>Link</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+</div>
 
-  <div id="toast" role="status" aria-live="polite"></div>
+<!-- toast -->
+<div id="toast" role="status" aria-live="polite">提示</div>
 
-  <script>
-    // 允许的图纸 domain/path（按需改）
-    const ALLOWED_HOST = "yourdomain.github.io";
-    const ALLOWED_PATH = "/repo";
+<script>
+// ---------- 配置区域 ----------
+const ALLOWED_HOST = "yourdomain.github.io"; // 允许的 host（严格匹配）
+const ALLOWED_PATH = "/repo";               // 允许的路径（不区分尾部 /）
+// --------------------------------
 
-    const html5QrCode = new Html5Qrcode("reader", { verbose: false });
+const html5QrCode = new Html5Qrcode("reader");
+const input = document.getElementById("scannerInput");
+const toast = document.getElementById("toast");
+const resultTable = document.querySelector("#resultTable tbody");
+const countBox = document.getElementById("countBox");
+const currentInfo = document.getElementById("currentInfo");
+const scannedLinks = new Set();
 
-    const scannerInput = document.getElementById("scannerInput");
-    const toast = document.getElementById("toast");
-    const resultTbody = document.querySelector("#resultTable tbody");
-    const currentInfo = document.getElementById("currentInfo");
-    const countBox = document.getElementById("countBox");
-    const readerEl = document.getElementById("reader");
-    const focusBox = document.getElementById("focusBox");
+// 冷却记录（比如重复扫描提示 3 秒冷却）
+const lastToastTimes = {
+duplicate: 0
+};
+let toastTimeout = null;
 
-    let scannedLinks = new Set();
-    let lastDuplicateTime = 0;
-    let toastTimer = null;
+function showToast(msg, type = "info") {
+// type: "info" | "warn" | "error"
+toast.textContent = msg;
+// 设置背景颜色
+if (type === "info") {
+toast.style.backgroundColor = "#007bff"; // blue
+} else if (type === "warn") {
+toast.style.backgroundColor = "#ff9800"; // orange
+} else if (type === "error") {
+toast.style.backgroundColor = "#e74c3c"; // red
+} else {
+toast.style.backgroundColor = "#333";
+}
 
-    function showToast(msg, bg) {
-      toast.textContent = msg;
-      toast.style.backgroundColor = bg || "#333";
-      toast.classList.add("show");
-      if (toastTimer) clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => { toast.classList.remove("show"); toastTimer = null; }, 2000);
-    }
+toast.classList.add("show");
+if (toastTimeout) clearTimeout(toastTimeout);
+toastTimeout = setTimeout(() => {
+toast.classList.remove("show");
+toastTimeout = null;
+}, 2000);
+}
 
-    function updateCount() {
-      countBox.textContent = "已扫描 " + scannedLinks.size + " 张图纸";
-    }
+function updateCount() {
+countBox.textContent = "已扫描 " + scannedLinks.size + " 张图纸";
+}
 
-    function normalizePath(p){ return (p||"").replace(/\/+$/,""); }
+function normalizePath(path) {
+return path.replace(/\/+$/, ""); // 去掉尾部斜杠
+}
 
-    function isPaperUrl(u){
-      try {
-        const host = (u.hostname || "").toLowerCase();
-        const path = normalizePath(u.pathname || "");
-        const hasParams = u.searchParams.get("so") && u.searchParams.get("item");
-        return host === ALLOWED_HOST && path === ALLOWED_PATH && hasParams;
-      } catch(e){ return false; }
-    }
+function isPaperUrl(u) {
+try {
+const host = (u.hostname || "").toLowerCase();
+const path = normalizePath(u.pathname || "");
+// 必须完全匹配 host + path，并且至少含 so 和 item 两个查询参数
+const hasParams = u.searchParams.get("so") && u.searchParams.get("item");
+return host === ALLOWED_HOST && path === ALLOWED_PATH && hasParams;
+} catch (e) {
+return false;
+}
+}
 
-    function formatDataFromUrl(u){
-      const normalizedUrl = u.origin + normalizePath(u.pathname) + (u.search || "");
-      let salesOrder = u.searchParams.get("so") || "";
-      let item = u.searchParams.get("item") || "";
-      let name = u.searchParams.get("name") || "";
-      let unit = u.searchParams.get("unit") || "";
-      let dim = u.searchParams.get("dim") || "";
-      if (salesOrder) salesOrder = salesOrder.replace(/^SO-?/i, "SO-");
-      if (dim) dim = dim.replace(/x/g, " x ") + " mm";
-      if (name) name = decodeURIComponent(name).replace(/\+/g," ");
-      return { salesOrder, item, name, unit, dim, url: normalizedUrl };
-    }
+function formatData(u) {
+// 标准化 url 作为去重 key（去掉 hash）
+const normalizedUrl = u.origin + normalizePath(u.pathname) + (u.search || "");
+let salesOrder = u.searchParams.get("so") || "";
+let item = u.searchParams.get("item") || "";
+let name = u.searchParams.get("name") || "";
+let unit = u.searchParams.get("unit") || "";
+let dim = u.searchParams.get("dim") || "";
 
-    function displayCurrent(data){
-      currentInfo.innerHTML = `
-        <b>Sales Order:</b> ${data.salesOrder || "-"} <br>
-        <b>Item No.:</b> ${data.item || "-"} <br>
-        <b>Name:</b> ${data.name || "-"} <br>
-        <b>Units:</b> ${data.unit || "-"} <br>
-        <b>Dimension:</b> ${data.dim || "-"} <br>
-        <b>Link:</b> <a href="${data.url}" target="_blank" rel="noopener">${data.url}</a>
-      `;
-    }
+if (salesOrder) {
+// 例：SO2345 -> SO-2345
+salesOrder = salesOrder.replace(/^SO-?/i, "SO-");
+}
+if (dim) {
+dim = dim.replace(/x/g, " x ") + " mm";
+}
+if (name) {
+// URL encoding 下的 + 变成空格
+name = name.replace(/\+/g, " ");
+}
 
-    function addToList(data){
-      if (scannedLinks.has(data.url)) {
-        const now = Date.now();
-        if (now - lastDuplicateTime > 3000) {
-          lastDuplicateTime = now;
-          showToast("已扫描过该图纸", "#ff9800");
-        }
-        return;
-      }
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${data.salesOrder}</td><td>${data.item}</td><td>${data.name}</td><td>${data.unit}</td><td>${data.dim}</td><td><a href="${data.url}" target="_blank" rel="noopener">Link</a></td>`;
-      resultTbody.prepend(tr);
-      scannedLinks.add(data.url);
-      updateCount();
-      showToast("已加入扫描记录", "#007bff");
-    }
+return {
+salesOrder,
+item,
+name,
+unit,
+dim,
+url: normalizedUrl
+};
+}
 
-    function handleScannedText(text){
-      if (!text) return;
-      text = text.trim();
-      try {
-        const u = new URL(text);
-        if (isPaperUrl(u)) {
-          const data = formatDataFromUrl(u);
-          displayCurrent(data);
-          addToList(data);
-        } else {
-          currentInfo.textContent = "非图纸 QR，已忽略: " + text;
-          showToast("非图纸 QR 已忽略", "#333");
-        }
-      } catch (e) {
-        currentInfo.textContent = "无效的 QR 内容: " + text;
-        showToast("无效的 QR 内容", "#e74c3c");
-      }
-    }
+function displayCurrent(data) {
+currentInfo.innerHTML = `
+<b>Sales Order:</b> ${data.salesOrder || "-"} <br>
+<b>Item No.:</b> ${data.item || "-"} <br>
+<b>Name:</b> ${data.name || "-"} <br>
+<b>Units:</b> ${data.unit || "-"} <br>
+<b>Dimension:</b> ${data.dim || "-"} <br>
+<b>Link:</b> <a href="${data.url}" target="_blank" rel="noopener">Link</a>
+`;
+}
 
-    // 计算焦框大小（reader 宽度的 70%）
-    function calcFocusSize(){
-      const w = Math.max(80, readerEl.clientWidth || 200);
-      return Math.floor(w * 0.7);
-    }
-    function resizeFocusBox(){
-      const s = calcFocusSize();
-      focusBox.style.width = s + "px";
-      focusBox.style.height = s + "px";
-      focusBox.style.boxShadow = "0 0 0 9999px rgba(0,0,0,0.45)";
-    }
-    window.addEventListener("resize", resizeFocusBox);
+function addToList(data) {
+// 去重：使用标准化的 data.url
+if (scannedLinks.has(data.url)) {
+// 重复冷却 3 秒
+const now = Date.now();
+if (now - lastToastTimes.duplicate > 3000) {
+lastToastTimes.duplicate = now;
+showToast("已扫描过该图纸", "warn");
+}
+return;
+}
+let row = document.createElement("tr");
+row.innerHTML = `
+<td>${data.salesOrder}</td>
+<td>${data.item}</td>
+<td>${data.name}</td>
+<td>${data.unit}</td>
+<td>${data.dim}</td>
+<td><a href="${data.url}" target="_blank" rel="noopener">Link</a></td>
+`;
+resultTable.appendChild(row);
+scannedLinks.add(data.url);
+updateCount();
+showToast("已加入扫描记录", "info");
+}
 
-    // qrbox 函数（html5-qrcode 将传入 viewfinderW/H）
-    const qrboxFunc = (viewfinderWidth, viewfinderHeight) => {
-      // 优先使用实际 reader 宽度（更贴合 UI）
-      const size = calcFocusSize();
-      return { width: size, height: size };
-    };
+function handleScan(text) {
+if (!text) return;
+// 有些扫描器可能会抓到末尾的换行，先 trim
+text = text.trim();
 
-    // Scanner 配置（优化小/模糊码识别）
-    const scannerConfig = {
-      fps: 7,
-      qrbox: qrboxFunc,
-      disableFlip: false // 允许自动翻转，若你想关掉可设 true
-    };
+try {
+const u = new URL(text);
 
-    // 启动扫描（稳健调用：用 facingMode 简洁启动）
-    function startScanner(){
-      // 停止旧的（若已运行）
-      if (html5QrCode && html5QrCode.getState && html5QrCode.getState() === Html5QrcodeScannerState?.SCANNING) {
-        // already scanning
-      }
-      Html5Qrcode.getCameras().then(cameras => {
-        let pref = { facingMode: "environment" };
-        // 尝试优先使用已识别的后置设备 ID（若可用）
-        if (cameras && cameras.length) {
-          for (const c of cameras) {
-            const lbl = (c.label||"").toLowerCase();
-            if (lbl.includes("back") || lbl.includes("rear") || lbl.includes("后")) {
-              // use deviceId exact when available for stability
-              pref = { deviceId: { exact: c.id } };
-              break;
-            }
-          }
-        }
-        html5QrCode.start(
-          pref,
-          scannerConfig,
-          (decodedText, decodedResult) => { handleScannedText(decodedText); },
-          (errorMessage) => { /* per-frame error, ignore silently */ }
-        ).then(() => {
-          // 等 video ready 后调整焦框
-          setTimeout(resizeFocusBox, 260);
-          // 另外周期性微调（应对某些手机延迟渲染）
-          setTimeout(resizeFocusBox, 800);
-        }).catch(err => {
-          console.error("启动扫描失败:", err);
-          showToast("相机启动失败，请允许相机权限或刷新页面", "#e74c3c");
-        });
-      }).catch(err => {
-        console.error("获取相机失败:", err);
-        showToast("无法访问相机", "#e74c3c");
-      });
-    }
+if (isPaperUrl(u)) {
+// 是允许的图纸链接
+const data = formatData(u);
+displayCurrent(data);
+addToList(data);
+} else {
+// 非图纸的 URL（包含当前页面自己产生的链接）
+currentInfo.textContent = "非图纸 QR，已忽略: " + text;
+showToast("非图纸 QR 已忽略", "info");
+}
+} catch (err) {
+// 不是有效 URL
+currentInfo.textContent = "无效的 QR 内容: " + text;
+showToast("无效的 QR 内容", "error");
+}
+}
 
-    // 手动输入支持（按 Enter）
-    scannerInput.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") {
-        const t = scannerInput.value.trim();
-        if (t) handleScannedText(t);
-        scannerInput.value = "";
-      }
-    });
+function startScanning() {
+html5QrCode.start(
+{ facingMode: "environment" },
+{
+fps: 15,
+qrbox: (vw, vh) => {
+// qrbox 设为可变大小，保证在手机上既不会太小也不会太大
+let minEdge = Math.min(vw, vh);
+return { width: Math.round(minEdge * 0.7), height: Math.round(minEdge * 0.7) };
+}
+},
+(decodedText) => handleScan(decodedText),
+(errorMessage) => {
+// 可选：扫描失败回调（每帧）
+// console.debug("扫描尝试:", errorMessage);
+}
+).catch(err => {
+console.error("扫描启动失败:", err);
+showToast("相机启动失败，请检查权限或在设置中允许相机访问", "error");
+});
+}
 
-    // 卸载时停止相机
-    window.addEventListener("beforeunload", () => {
-      if (html5QrCode) {
-        html5QrCode.stop().catch(()=>{});
-      }
-    });
+startScanning();
 
-    // 启动
-    startScanner();
-    // 保险起见，延迟再做一次 resize
-    setTimeout(resizeFocusBox, 400);
-  </script>
+// 输入框也能手动输入二维码文本（按 Enter）
+input.addEventListener("keypress", function(e) {
+if (e.key === "Enter") {
+const text = input.value.trim();
+handleScan(text);
+input.value = "";
+}
+});
+
+// 可选：页面卸载或切换时停止相机
+window.addEventListener("beforeunload", function () {
+if (html5QrCode && html5QrCode.getState && html5QrCode.getState() !== /* STOPPED */ 2) {
+html5QrCode.stop().catch(() => {});
+}
+});
+</script>
 </body>
 </html>
 
